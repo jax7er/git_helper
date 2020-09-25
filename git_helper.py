@@ -4,10 +4,34 @@ from os.path import basename
 from subprocess import PIPE, run
 
 
+def is_even(n: int) -> bool:
+    """
+    Checks whether a number is even
+
+    :param n: the number to check for evenness
+    :returns: True if even else False
+    """
+
+    return n % 2 == 0
+
+
 def cmd(text: str) -> str:
+    """
+    Execute a command by extracting the tokens and passing to subprocess.run
+    Capable of extracting one level of double quoted tokens
+
+    :param text: the text of the command written as if in the command line
+    :returns: stdout from the command if the return code is 0
+    :raises ValueError: if text contains an odd number of quotes
+    :raises RuntimeError: if the command returns a non-zero return code
+    """
+
+    if not is_even(text.count("\"")):
+        raise ValueError("Odd number of quotes in command text")
+    
     extracted_tokens = []
     for i, text in enumerate(text.split("\"")):
-        if i % 2 == 0:
+        if is_even(i):
             extracted_tokens.extend(text.split())
         else:
             extracted_tokens.append(f"\"{text}\"")
@@ -15,20 +39,40 @@ def cmd(text: str) -> str:
     called = run(extracted_tokens, stdout=PIPE, stderr=PIPE)
 
     if called.returncode == 0:
-        return called.stdout
+        return str(called.stdout, "ascii")
     else:
         raise RuntimeError(f"Running \"{cmd}\" failed, stderr:\n{called.stderr}")
 
 
 def exists(file_path: str) -> bool:
+    """
+    Checks whether a file/folder exists by using glob.glob
+
+    :param file_path: path of the file/folder to check existence of
+    :returns: True if exists else False
+    """
+
     return len(glob(file_path)) == 1
 
 
-def git_pull():
-    cmd("git pull")
+def git_pull() -> str:
+    """
+    Calls git pull
+
+    :returns: output from command
+    """
+
+    return cmd("git pull")
 
 
-def git_push():
+def git_push() -> str:
+    """
+    Calls git add, commit, and push with user customisable arguments
+    Also can create a readme file if it doesn't already exist
+
+    :returns: cumulative output from commands
+    """
+
     default_branch = "master"
     default_create_readme = "y"
     default_readme = f"# {basename(getcwd())}"
@@ -54,19 +98,29 @@ def git_push():
 
     print("Pushing to remote")
 
-    cmd("git add --all")
-    cmd(f"git commit --message \"{message}\"")
-    cmd(f"git push origin {branch}")
+    cmd_out = ""
+    cmd_out += cmd("git add --all")
+    cmd_out += cmd(f"git commit --message \"{message}\"")
+    cmd_out += cmd(f"git push origin {branch}")
+
+    return cmd_out
 
 
-def main():
-    valid_operations_map = {"push": git_push, "pull": git_pull}
-    default_operation = "push"
+def main() -> str:
+    """
+    Controls flow of program asking for user input and calling commands as necessary
+
+    :returns: cumulative output from commands
+    """
+
+    cmd_out = ""
+    valid_cmds_map = {"push": git_push, "pull": git_pull}
+    default_cmd = "push"
 
     if not exists(".git"):
         print("Repo not initialised, running git init")
 
-        cmd("git init")
+        cmd_out += cmd("git init")
 
         url = ""
         while True:
@@ -77,18 +131,20 @@ def main():
             else:
                 print("Enter a URL starting with https://")
 
-        cmd(f"git remote add origin {url}")
+        cmd_out += cmd(f"git remote add origin {url}")
 
-    operation = ""
+    user_cmd = ""
     while True:
-        operation = input(f"Operation [{'|'.join(valid_operations_map)}], default {default_operation}: ").strip().lower() or default_operation
+        user_cmd = input(f"Command [{'|'.join(valid_cmds_map)}], default {default_cmd}: ").strip().lower() or default_cmd
 
-        if operation in valid_operations_map:
+        if user_cmd in valid_cmds_map:
             break
         else:
-            print("Enter a valid operation")
+            print("Enter a valid command")
 
-    valid_operations_map[operation]()
+    cmd_out += valid_cmds_map[user_cmd]()
+
+    return cmd_out
 
 
 if __name__ == "__main__":
