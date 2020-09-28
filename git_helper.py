@@ -34,7 +34,7 @@ def cmd(text: str) -> str:
         if is_even(i):
             extracted_tokens.extend(text.split())
         else:
-            extracted_tokens.append(f"\"{text}\"")
+            extracted_tokens.append(text)
 
     called = run(extracted_tokens, stdout=PIPE, stderr=PIPE)
 
